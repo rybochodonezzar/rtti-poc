@@ -222,7 +222,8 @@ template <typename T> bool isDerivedOrSame(const TypeInfo& ti)
     return type_index{typeid(T)} == ti.id
 	|| any_of(ti.baseIds.begin(), ti.baseIds.end(), [&](auto& idx) {
 	    auto& tm = TypeManager::get();
-	    return tm.byId.count(idx) && isDerivedOrSame<T>(*tm.byId.at(idx));
+	    return idx == type_index{typeid(T)} // this condition may be checked twice, but this is just PoC code
+		|| tm.byId.count(idx) && isDerivedOrSame<T>(*tm.byId.at(idx));
 	});
 }
 
@@ -264,7 +265,7 @@ template <> struct RTTIinfo<B> {
 int main()
 {
     auto& tm = TypeManager::get();
-    tm.registerOrGetType<A>();
+    //tm.registerOrGetType<A>();
     B b;
     b.intVal = 7;
     b.intVal2 = 666;
