@@ -54,42 +54,35 @@ auto runByBase = [](auto x, auto f)
 /* attribute defintions */
 
 template <typename T> struct RTTIinfo;
+template <typename T> struct FieldTypeStuff; //need better name
 
 struct isField {
     const char* name;
-    virtual void /* Bob! */ doSomething(void* source) = 0;
-    /* should these be virtual? */
     virtual string toString(void* source) = 0;
-    virtual const char* typeName() = 0;
-    constexpr isField(const char* name) : name{name} {}
+    const char* typeName;
+    constexpr isField(const char* name, const char* typeName) : name{name}, typeName{typeName} {}
 };
 
-template <typename T1, typename T2> struct Field : public isField {};
+
+template <typename T, typename C>
+struct Field : public isField {
+    using type = T;
+    T C::*fieldptr;
+    constexpr Field(T C::*fieldptr, const char* name) : isField{name, FieldTypeStuff<T>::name}, fieldptr{fieldptr} {}
+    string toString(void* source) { return FieldTypeStuff<T>::toString((C*)source->*fieldptr); }
+};
+
+template <> struct FieldTypeStuff<int> {
+    constexpr static const char* name{"int"};
+    static string toString(int source){ return to_string(source); }
+};
+
+template <> struct FieldTypeStuff<string> {
+    constexpr static const char* name{"string"};
+    static string toString(string& source) { return string(source); }
+};
+    
 template <typename Type, typename Class> constexpr Field<Type, Class> field(Type Class::*ptr, const char* name) { return Field<Type, Class>{ptr, name}; }
-
-template <typename T>
-struct Field<int, T> : public isField {
-    typedef T type;
-    int T::*fieldptr;
-    constexpr Field(int T::*fieldptr, const char* name) : isField{name}, fieldptr{fieldptr} {}
-    void doSomething(void* source) override {
-        cout << "doing something with int field " << name << " with value " << (T*)source->*fieldptr << endl;
-    }
-    string toString(void* source) { return to_string((T*)source->*fieldptr); }
-    const char* typeName() { return "int"; }
-};
-
-template <typename T>
-struct Field<string, T> : public isField {
-    typedef T type;
-    string T::*fieldptr;
-    constexpr Field(string T::*fieldptr, const char* name) : isField{name}, fieldptr{fieldptr} {}
-    void doSomething(void* source) override {
-        cout << "doing something with string field " << name << " with value " << (T*)source->*fieldptr << endl;
-    }
-    string toString(void* source) { return string((T*)source->*fieldptr); }
-    const char* typeName() { return "string"; }
-};
 
 struct classname { const char* name; };
 
@@ -138,11 +131,11 @@ template <typename T> void serialize(T& src)
     runByBase<isDerived>(RTTIinfo<T>::info, [&](auto base) {
 	const char* basename = getClassName(base.info);
 	runByBase<isField>(base.info, [&](auto field) {
-	    cout << "    " << field.typeName() << " " << basename << "::" << field.name << " = " << field.toString(&src) << "\n";
+	    cout << "    " << field.typeName << " " << basename << "::" << field.name << " = " << field.toString(&src) << "\n";
 	});
     });
     runByBase<isField>(RTTIinfo<T>::info, [&](auto field) {
-	cout << "    " << field.typeName() << " " << name << "::" << field.name << " = " << field.toString(&src) << "\n";
+	cout << "    " << field.typeName << " " << name << "::" << field.name << " = " << field.toString(&src) << "\n";
     });
     cout << "};\n";
 }
