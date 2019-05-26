@@ -56,6 +56,10 @@ auto runByBase = [](auto x, auto f)
 template <typename T> struct RTTIinfo;
 template <typename T> struct FieldTypeStuff; //need better name
 
+template <typename T> struct SimpleAttribute {
+    using storage_type = T;
+};
+
 struct isField {
     const char* name;
     virtual string toString(void* source) = 0;
