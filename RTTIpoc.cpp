@@ -146,7 +146,8 @@ struct TypeInfo {
     const char* name;
     type_index id;
     vector<type_index> baseIds;
-    vector<unique_ptr<isField>> fields;
+    using deleterT = function<void(isField*)>;
+    vector<unique_ptr<isField, deleterT>> fields;
     function<void*()> construct;
     function<void(void*)> serialize;
     TypeInfo() :
@@ -166,9 +167,10 @@ struct TypeInfo {
 		using type = typename decltype(x)::type;
 		baseIds.emplace_back(type_index{typeid(type)});
 	    }
-	    if constexpr (is_base_of<isField, decltype(x)>::value) {
+	    if constexpr (is_base_of<isField, deleterT>::value) {
 		using FieldT = decltype(x);
-		fields.emplace_back(unique_ptr<isField>{new FieldT{x}});
+                auto deleter = [](isField* p){ delete (static_cast<decltype(x)*>(p)); };
+		fields.emplace_back(unique_ptr<isField, deleterT>(new FieldT{x}, deleter));
 	    }
 	});
 	id = type_index{typeid(T)};
@@ -216,7 +218,7 @@ template <typename T> bool isDerivedOrSame(const TypeInfo& ti)
 	|| any_of(ti.baseIds.begin(), ti.baseIds.end(), [&](auto& idx) {
 	    auto& tm = TypeManager::get();
 	    return idx == type_index{typeid(T)} // this condition may be checked twice, but this is just PoC code
-		|| tm.byId.count(idx) && isDerivedOrSame<T>(*tm.byId.at(idx));
+		|| (tm.byId.count(idx) && isDerivedOrSame<T>(*tm.byId.at(idx)));
 	});
 }
 
